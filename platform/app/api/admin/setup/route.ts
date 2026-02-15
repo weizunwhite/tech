@@ -1,8 +1,14 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-// POST /api/admin/setup — Bootstrap the admin account
-// Only works if no admin account exists yet
+const TEST_ACCOUNTS = [
+  { email: "admin@test.com", password: "test123", name: "测试管理员", role: "admin" },
+  { email: "teacher@test.com", password: "test123", name: "测试教师", role: "teacher" },
+  { email: "student@test.com", password: "test123", name: "测试学生", role: "student", grade: 6 },
+  { email: "parent@test.com", password: "test123", name: "测试家长", role: "parent" },
+];
+
+// POST /api/admin/setup — Bootstrap all test accounts
 export async function POST(request: NextRequest) {
   try {
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -10,97 +16,78 @@ export async function POST(request: NextRequest) {
 
     if (!serviceRoleKey) {
       return Response.json(
-        { error: "缺少 SUPABASE_SERVICE_ROLE_KEY 环境变量，无法创建管理员" },
+        { error: "缺少 SUPABASE_SERVICE_ROLE_KEY 环境变量" },
         { status: 500 }
       );
     }
 
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const results: { email: string; role: string; status: string }[] = [];
 
-    // Check if admin already exists in users table
-    const { data: existingAdmin } = await supabase
-      .from("users")
-      .select("id")
-      .eq("role", "admin")
-      .limit(1)
-      .single();
+    for (const account of TEST_ACCOUNTS) {
+      // Check if already exists in users table
+      const { data: existing } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", account.email)
+        .limit(1)
+        .single();
 
-    if (existingAdmin) {
-      return Response.json(
-        { message: "管理员账号已存在，可直接登录", email: "admin@admin.com" },
-        { status: 200 }
-      );
-    }
+      if (existing) {
+        results.push({ email: account.email, role: account.role, status: "已存在" });
+        continue;
+      }
 
-    // Use admin API to create user with email pre-confirmed
-    const { data: authData, error: authError } =
-      await supabase.auth.admin.createUser({
-        email: "admin@admin.com",
-        password: "admin123",
-        email_confirm: true,
-        user_metadata: { name: "管理员", role: "admin" },
-      });
+      // Create auth user with email confirmed
+      const { data: authData, error: authError } =
+        await supabase.auth.admin.createUser({
+          email: account.email,
+          password: account.password,
+          email_confirm: true,
+          user_metadata: { name: account.name, role: account.role },
+        });
 
-    if (authError) {
-      // If auth user already exists but not in users table, look it up
-      if (authError.message.includes("already been registered")) {
-        const { data: listData } = await supabase.auth.admin.listUsers();
-        const existingAuthUser = listData?.users?.find(
-          (u) => u.email === "admin@admin.com"
-        );
+      let authId: string | null = authData?.user?.id ?? null;
 
-        if (existingAuthUser) {
-          // Confirm email if not confirmed
-          if (!existingAuthUser.email_confirmed_at) {
-            await supabase.auth.admin.updateUserById(existingAuthUser.id, {
-              email_confirm: true,
-            });
+      if (authError) {
+        if (authError.message.includes("already been registered")) {
+          // Auth user exists, find and confirm email
+          const { data: listData } = await supabase.auth.admin.listUsers();
+          const found = listData?.users?.find((u) => u.email === account.email);
+          if (found) {
+            authId = found.id;
+            if (!found.email_confirmed_at) {
+              await supabase.auth.admin.updateUserById(found.id, {
+                email_confirm: true,
+              });
+            }
           }
-
-          // Create profile in users table
-          await supabase.from("users").upsert(
-            {
-              auth_id: existingAuthUser.id,
-              email: "admin@admin.com",
-              name: "管理员",
-              role: "admin",
-            },
-            { onConflict: "auth_id" }
-          );
-
-          return Response.json({
-            success: true,
-            message: "管理员账号已修复（邮箱已确认），可直接登录",
-            email: "admin@admin.com",
-          });
+        } else {
+          results.push({ email: account.email, role: account.role, status: "失败: " + authError.message });
+          continue;
         }
       }
 
-      return Response.json(
-        { error: "创建失败: " + authError.message },
-        { status: 500 }
-      );
-    }
-
-    // Create user profile in users table
-    if (authData.user) {
-      const { error: profileError } = await supabase.from("users").insert({
-        auth_id: authData.user.id,
-        email: "admin@admin.com",
-        name: "管理员",
-        role: "admin",
-      });
-
-      if (profileError) {
-        console.error("Admin profile creation error:", profileError);
+      if (authId) {
+        await supabase.from("users").upsert(
+          {
+            auth_id: authId,
+            email: account.email,
+            name: account.name,
+            role: account.role,
+            grade: account.role === "student" ? (account as { grade?: number }).grade : null,
+          },
+          { onConflict: "auth_id" }
+        );
+        results.push({ email: account.email, role: account.role, status: "创建成功" });
       }
     }
 
     return Response.json({
       success: true,
-      message: "管理员账号创建成功",
-      email: "admin@admin.com",
-      hint: "请使用 admin@admin.com / admin123 登录",
+      message: "测试账号初始化完成",
+      accounts: results,
+      hint: "统一密码: test123",
     });
   } catch {
     return Response.json({ error: "服务器错误" }, { status: 500 });
