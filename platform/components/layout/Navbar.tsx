@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,12 +13,51 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Lightbulb, LogOut, User } from "lucide-react";
 
-interface NavbarProps {
-  userName?: string;
+type Role = "student" | "teacher" | "parent" | "admin";
+
+interface NavLink {
+  href: string;
+  label: string;
 }
 
-export function Navbar({ userName }: NavbarProps) {
+const NAV_LINKS: Record<Role, NavLink[]> = {
+  student: [],
+  teacher: [
+    { href: "/teacher/dashboard", label: "仪表盘" },
+    { href: "/teacher/students", label: "学生管理" },
+  ],
+  parent: [
+    { href: "/parent/dashboard", label: "首页" },
+  ],
+  admin: [
+    { href: "/admin/dashboard", label: "概览" },
+    { href: "/admin/users", label: "用户管理" },
+    { href: "/admin/projects", label: "项目管理" },
+  ],
+};
+
+const HOME_PATHS: Record<Role, string> = {
+  student: "/dashboard",
+  teacher: "/teacher/dashboard",
+  parent: "/parent/dashboard",
+  admin: "/admin/dashboard",
+};
+
+const ROLE_LABELS: Record<Role, string> = {
+  student: "学生",
+  teacher: "教师",
+  parent: "家长",
+  admin: "管理员",
+};
+
+interface NavbarProps {
+  userName?: string;
+  role?: Role;
+}
+
+export function Navbar({ userName, role = "student" }: NavbarProps) {
   const router = useRouter();
+  const pathname = usePathname();
 
   async function handleLogout() {
     const supabase = createClient();
@@ -28,16 +67,42 @@ export function Navbar({ userName }: NavbarProps) {
   }
 
   const initials = userName ? userName.slice(0, 1) : "U";
+  const navLinks = NAV_LINKS[role];
+  const homePath = HOME_PATHS[role];
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur">
       <div className="container flex h-14 items-center justify-between px-4 mx-auto max-w-7xl">
-        <Link href="/dashboard" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <Lightbulb className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-semibold text-lg">零一优创</span>
-        </Link>
+        <div className="flex items-center gap-6">
+          <Link href={homePath} className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+              <Lightbulb className="w-4 h-4 text-primary-foreground" />
+            </div>
+            <span className="font-semibold text-lg">零一优创</span>
+            {role !== "student" && (
+              <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                {ROLE_LABELS[role]}
+              </span>
+            )}
+          </Link>
+          {navLinks.length > 0 && (
+            <nav className="hidden sm:flex items-center gap-1">
+              {navLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`text-sm px-3 py-1.5 rounded-md transition-colors ${
+                    pathname === link.href || pathname.startsWith(link.href + "/")
+                      ? "bg-primary/10 text-primary font-medium"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+          )}
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

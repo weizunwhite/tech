@@ -23,13 +23,22 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  function getRoleHomePath(role: string): string {
+    switch (role) {
+      case "admin": return "/admin/dashboard";
+      case "teacher": return "/teacher/dashboard";
+      case "parent": return "/parent/dashboard";
+      default: return "/dashboard";
+    }
+  }
+
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -42,7 +51,8 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/dashboard");
+    const role = data.user?.user_metadata?.role || "student";
+    router.push(getRoleHomePath(role));
     router.refresh();
   }
 

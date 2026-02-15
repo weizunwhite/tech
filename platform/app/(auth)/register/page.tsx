@@ -14,9 +14,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Lightbulb, GraduationCap, Users } from "lucide-react";
+import { Lightbulb, GraduationCap, Users, BookOpen } from "lucide-react";
 
-type Role = "student" | "parent";
+type Role = "student" | "parent" | "teacher";
+
+const roleOptions: { role: Role; label: string; icon: React.ElementType; description: string }[] = [
+  { role: "student", label: "学生", icon: GraduationCap, description: "我要做科创项目" },
+  { role: "parent", label: "家长", icon: Users, description: "查看孩子的进度" },
+  { role: "teacher", label: "教师", icon: BookOpen, description: "管理和指导学生" },
+];
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -27,6 +33,15 @@ export default function RegisterPage() {
   const [grade, setGrade] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  function getRedirectPath(r: Role) {
+    switch (r) {
+      case "student": return "/dashboard";
+      case "parent": return "/parent/dashboard";
+      case "teacher": return "/teacher/dashboard";
+      default: return "/dashboard";
+    }
+  }
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
@@ -69,7 +84,7 @@ export default function RegisterPage() {
       }
     }
 
-    router.push("/dashboard");
+    router.push(getRedirectPath(role));
     router.refresh();
   }
 
@@ -90,51 +105,33 @@ export default function RegisterPage() {
             {/* Role Selection */}
             <div className="space-y-2">
               <Label>我是</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setRole("student")}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
-                    role === "student"
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  <GraduationCap
-                    className={`w-6 h-6 ${
-                      role === "student" ? "text-primary" : "text-muted-foreground"
-                    }`}
-                  />
-                  <span
-                    className={`text-sm font-medium ${
-                      role === "student" ? "text-primary" : "text-muted-foreground"
+              <div className="grid grid-cols-3 gap-3">
+                {roleOptions.map(({ role: r, label, icon: Icon, description }) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setRole(r)}
+                    className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border-2 transition-colors ${
+                      role === r
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/50"
                     }`}
                   >
-                    学生
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setRole("parent")}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-lg border-2 transition-colors ${
-                    role === "parent"
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/50"
-                  }`}
-                >
-                  <Users
-                    className={`w-6 h-6 ${
-                      role === "parent" ? "text-primary" : "text-muted-foreground"
-                    }`}
-                  />
-                  <span
-                    className={`text-sm font-medium ${
-                      role === "parent" ? "text-primary" : "text-muted-foreground"
-                    }`}
-                  >
-                    家长
-                  </span>
-                </button>
+                    <Icon
+                      className={`w-5 h-5 ${
+                        role === r ? "text-primary" : "text-muted-foreground"
+                      }`}
+                    />
+                    <span
+                      className={`text-sm font-medium ${
+                        role === r ? "text-primary" : "text-muted-foreground"
+                      }`}
+                    >
+                      {label}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground">{description}</span>
+                  </button>
+                ))}
               </div>
             </div>
 

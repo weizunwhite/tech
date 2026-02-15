@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import { ObservationForm } from "@/components/forms/ObservationForm";
+import { ResearchForm } from "@/components/forms/ResearchForm";
+import { UserPersonaForm } from "@/components/forms/UserPersonaForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CheckCircle, ArrowRight, Sparkles, HelpCircle } from "lucide-react";
@@ -35,7 +37,7 @@ export function StepContent({
     summary: string;
   } | null>(null);
 
-  // Determine if this is a form node (1.1, 2.2, 3.1)
+  // Determine if this is a form node
   const isFormNode = ["1.1", "2.2", "3.1"].includes(currentNode);
 
   async function handleFormSubmit(data: unknown) {
@@ -139,10 +141,48 @@ export function StepContent({
     }
   }
 
+  function renderForm() {
+    if (currentNode === "1.1") {
+      return (
+        <ObservationForm
+          projectId={projectId}
+          onSubmit={handleFormSubmit}
+          initialData={
+            existingFormData
+              ? (existingFormData as { observations?: Array<{ scene: string; who: string; problem: string; current_solution: string }> })?.observations
+              : undefined
+          }
+        />
+      );
+    }
+
+    if (currentNode === "2.2") {
+      return (
+        <ResearchForm
+          projectId={projectId}
+          onSubmit={handleFormSubmit}
+          initialData={existingFormData as Record<string, string> | undefined}
+        />
+      );
+    }
+
+    if (currentNode === "3.1") {
+      return (
+        <UserPersonaForm
+          projectId={projectId}
+          onSubmit={handleFormSubmit}
+          initialData={existingFormData as Record<string, string> | undefined}
+        />
+      );
+    }
+
+    return null;
+  }
+
   return (
-    <div className="flex-1 flex overflow-hidden">
+    <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         <ChatWindow
           projectId={projectId}
           stepNumber={stepNumber}
@@ -152,21 +192,11 @@ export function StepContent({
         />
       </div>
 
-      {/* Side Panel: Form or Complete Button */}
+      {/* Side Panel: Form or Complete Button (responsive) */}
       {!isLocked && (
-        <div className="w-96 border-l bg-card overflow-y-auto p-4 hidden lg:block">
-          {/* Form node: show observation form */}
-          {isFormNode && currentNode === "1.1" && (
-            <ObservationForm
-              projectId={projectId}
-              onSubmit={handleFormSubmit}
-              initialData={
-                existingFormData
-                  ? (existingFormData as { observations?: Array<{ scene: string; who: string; problem: string; current_solution: string }> })?.observations
-                  : undefined
-              }
-            />
-          )}
+        <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l bg-card overflow-y-auto p-4">
+          {/* Form node: show the appropriate form */}
+          {isFormNode && renderForm()}
 
           {/* Conversation node: show complete button */}
           {!isFormNode && (
