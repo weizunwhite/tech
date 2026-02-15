@@ -148,6 +148,9 @@ ALTER TABLE form_submissions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "users_select_own" ON users
   FOR SELECT USING (auth_id = auth.uid());
 
+CREATE POLICY "users_insert_own" ON users
+  FOR INSERT WITH CHECK (auth_id = auth.uid());
+
 CREATE POLICY "users_update_own" ON users
   FOR UPDATE USING (auth_id = auth.uid());
 
