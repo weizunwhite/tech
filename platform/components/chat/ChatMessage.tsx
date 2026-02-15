@@ -14,8 +14,14 @@ interface ChatMessageProps {
   message: Message;
 }
 
+/** Strip <think>...</think> blocks (multiline) from AI responses */
+function stripThinkTags(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+}
+
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
+  const displayContent = isUser ? message.content : stripThinkTags(message.content);
 
   return (
     <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
@@ -39,10 +45,10 @@ export function ChatMessage({ message }: ChatMessageProps) {
         )}
       >
         {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          <p className="whitespace-pre-wrap">{displayContent}</p>
         ) : (
           <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-            <ReactMarkdown>{message.content}</ReactMarkdown>
+            <ReactMarkdown>{displayContent}</ReactMarkdown>
           </div>
         )}
       </div>

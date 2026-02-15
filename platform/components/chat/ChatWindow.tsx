@@ -4,6 +4,20 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { ChatMessage, type Message } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 
+const STEP_WELCOME_MESSAGES: Record<number, string> = {
+  1: "你好！让我们从生活中的观察开始。最近有没有遇到什么不方便或者想改进的地方？",
+  2: "让我们一起来调查一下，你发现的这个问题，目前别人是怎么解决的？",
+  3: "现在让我们明确一下，你的作品需要满足哪些具体需求？",
+  4: "太好了！现在我们来设计解决方案。你觉得可以用什么方法来解决这个问题？",
+  5: "接下来我们要学习实现方案需要的技术知识。你之前接触过编程或者电子元器件吗？",
+  6: "动手时间到了！让我们开始搭建第一个可以运行的原型。",
+  7: "原型做好了，现在让我们来测试一下它是否真的能解决问题。",
+  8: "根据测试结果，让我们来看看哪些地方可以做得更好。",
+  9: "项目快完成了！现在让我们把整个过程写成研究论文。",
+  10: "让我们来准备竞赛展示材料，包括PPT和演讲稿。",
+  11: "最后一步！让我们模拟答辩，练习如何展示你的项目。",
+};
+
 interface ChatWindowProps {
   projectId: string;
   stepNumber: number;
@@ -34,6 +48,8 @@ export function ChatWindow({
     scrollToBottom();
   }, [messages, streamingContent, scrollToBottom]);
 
+  const welcomeMessage = STEP_WELCOME_MESSAGES[stepNumber] || "你好！我是你的科创引导助手，让我们开始吧！";
+
   const displayMessages =
     messages.length > 0
       ? messages
@@ -41,8 +57,7 @@ export function ChatWindow({
           {
             id: "welcome",
             role: "assistant" as const,
-            content:
-              "你好！我是你的科创引导助手。准备好开始探索了吗？告诉我，最近你在生活中有没有遇到什么不方便的事情？",
+            content: welcomeMessage,
             createdAt: new Date().toISOString(),
           },
         ];
