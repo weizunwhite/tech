@@ -22,6 +22,39 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [adminSetupMsg, setAdminSetupMsg] = useState("");
+
+  async function handleAdminTestLogin() {
+    setError("");
+    setAdminSetupMsg("正在初始化管理员账号...");
+    // 先调用 setup 接口确保管理员账号存在
+    try {
+      await fetch("/api/admin/setup", { method: "POST" });
+    } catch {
+      // 忽略，可能已存在
+    }
+    // 自动填入并登录
+    setEmail("admin@admin.com");
+    setPassword("admin123");
+    setAdminSetupMsg("");
+    setLoading(true);
+
+    const supabase = createClient();
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({
+      email: "admin@admin.com",
+      password: "admin123",
+    });
+
+    if (loginError) {
+      setError("管理员登录失败: " + loginError.message);
+      setLoading(false);
+      return;
+    }
+
+    const role = data.user?.user_metadata?.role || "student";
+    router.push(getRoleHomePath(role));
+    router.refresh();
+  }
 
   function getRoleHomePath(role: string): string {
     switch (role) {
@@ -99,6 +132,20 @@ export default function LoginPage() {
               {loading ? "登录中..." : "登录"}
             </Button>
           </form>
+          <div className="mt-4 pt-4 border-t border-dashed">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full text-sm"
+              onClick={handleAdminTestLogin}
+              disabled={loading}
+            >
+              {adminSetupMsg || "🔑 管理员测试登录"}
+            </Button>
+            <p className="mt-1 text-center text-[11px] text-muted-foreground">
+              admin@admin.com / admin123
+            </p>
+          </div>
           <p className="mt-4 text-center text-sm text-muted-foreground">
             还没有账号？{" "}
             <Link href="/register" className="text-primary hover:underline">
