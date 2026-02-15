@@ -6,7 +6,8 @@ import { ChatWindow } from "@/components/chat/ChatWindow";
 import { ObservationForm } from "@/components/forms/ObservationForm";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle, ArrowRight, Sparkles } from "lucide-react";
+import { CheckCircle, ArrowRight, Sparkles, HelpCircle } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
 import type { Message } from "@/components/chat/ChatMessage";
 
@@ -221,6 +222,33 @@ export function StepContent({
               )}
             </div>
           )}
+
+          {/* Help request button (Level 3 hint) */}
+          <Separator className="my-4" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full text-muted-foreground"
+            onClick={async () => {
+              try {
+                await fetch(`/api/projects/${projectId}/help-request`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    stepNumber,
+                    nodeId: currentNode,
+                    reason: "学生主动请求帮助",
+                  }),
+                });
+                toast.success("已通知老师，请继续尝试，老师会尽快来帮助你");
+              } catch {
+                toast.error("发送失败，请重试");
+              }
+            }}
+          >
+            <HelpCircle className="w-4 h-4 mr-1" />
+            需要老师帮助
+          </Button>
         </div>
       )}
     </div>

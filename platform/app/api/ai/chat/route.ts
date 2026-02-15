@@ -55,6 +55,43 @@ export async function POST(request: NextRequest) {
       .eq("project_id", projectId)
       .lt("step_number", stepNumber);
 
+    // Load previous node's form data (e.g., 1.1 data for 1.2)
+    let previousFormData = null;
+    let selectedProblem = null;
+
+    if (nodeId === "1.2") {
+      // Load 1.1 observation form data
+      const { data: formData } = await supabase
+        .from("form_submissions")
+        .select("data")
+        .eq("project_id", projectId)
+        .eq("step_number", stepNumber)
+        .eq("node_id", "1.1")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .single();
+      previousFormData = formData?.data || null;
+    }
+
+    if (nodeId === "1.3") {
+      // Extract selected problem from 1.2 conversation
+      const { data: conv12 } = await supabase
+        .from("conversations")
+        .select("role, content")
+        .eq("project_id", projectId)
+        .eq("step_number", stepNumber)
+        .eq("node_id", "1.2")
+        .order("created_at");
+
+      // Get the student's last few messages as the selected problem context
+      const studentMessages = (conv12 || [])
+        .filter((c) => c.role === "user")
+        .map((c) => c.content);
+      if (studentMessages.length > 0) {
+        selectedProblem = studentMessages.slice(-3).join("\n");
+      }
+    }
+
     // Build AI context
     const context = buildContext({
       stepNumber,
@@ -67,6 +104,8 @@ export async function POST(request: NextRequest) {
           role: h.role as "user" | "assistant",
           content: h.content,
         })) || [],
+      previousFormData,
+      selectedProblem,
     });
 
     if (!context) {
