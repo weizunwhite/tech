@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getNodeConfig } from "@/configs/steps";
 import { evaluateCompletion } from "@/lib/ai/evaluator";
+import { summarizeConversation } from "@/lib/ai/context-builder";
 
 export async function POST(
   request: NextRequest,
@@ -86,11 +87,28 @@ export async function POST(
         .eq("node_id", nodeId)
         .order("created_at");
 
-      // Extract student's key content from conversations
-      const studentContent = (conversations || [])
-        .filter((c) => c.role === "user")
-        .map((c) => c.content)
-        .join("\n");
+      const convMessages = (conversations || []).map((c) => ({
+        role: c.role,
+        content: c.content,
+      }));
+
+      // Use AI to generate a proper deliverable document
+      let generatedDoc = "";
+      const purposeMap: Record<string, string> = {
+        problem_selection: "问题筛选分析报告，包含对每个候选问题的分析和最终选择的理由",
+        problem_description: "问题描述文档，包含问题背景、影响人群、现状分析和学生的思考",
+      };
+
+      const purpose = purposeMap[nodeConfig.deliverable.type] || "文档摘要";
+
+      try {
+        generatedDoc = await summarizeConversation(convMessages, purpose);
+      } catch {
+        generatedDoc = convMessages
+          .filter((c) => c.role === "user")
+          .map((c) => c.content)
+          .join("\n");
+      }
 
       await supabase.from("deliverables").insert({
         project_id: projectId,
@@ -99,7 +117,7 @@ export async function POST(
         type: nodeConfig.deliverable.type,
         title: nodeConfig.title,
         content: {
-          raw: studentContent,
+          document: generatedDoc,
           conversations: conversations || [],
         },
         status: "draft",
