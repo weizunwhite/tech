@@ -32,7 +32,7 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
 
   // Protected routes: redirect to login if not authenticated
-  const protectedPaths = ["/dashboard", "/project", "/teacher", "/parent"];
+  const protectedPaths = ["/dashboard", "/project", "/teacher", "/parent", "/admin"];
   const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
 
   if (isProtected && !user) {
@@ -53,28 +53,33 @@ export async function middleware(request: NextRequest) {
   }
 
   // Role-based access control: prevent accessing wrong portal
+  // Admin can access everything
   if (user && isProtected) {
     const role = user.user_metadata?.role || "student";
 
-    // Student trying to access teacher/parent portal
-    if (role === "student" && (pathname.startsWith("/teacher") || pathname.startsWith("/parent/dashboard"))) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
-    }
-
-    // Teacher trying to access student dashboard
-    if (role === "teacher" && pathname.startsWith("/dashboard")) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/teacher/dashboard";
-      return NextResponse.redirect(url);
-    }
-
-    // Parent trying to access student dashboard or teacher portal
-    if (role === "parent" && (pathname.startsWith("/dashboard") || pathname.startsWith("/teacher"))) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/parent/dashboard";
-      return NextResponse.redirect(url);
+    if (role === "admin") {
+      // Admin has full access — no redirects
+    } else if (role === "student") {
+      // Student trying to access teacher/parent/admin portal
+      if (pathname.startsWith("/teacher") || pathname.startsWith("/parent/dashboard") || pathname.startsWith("/admin")) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/dashboard";
+        return NextResponse.redirect(url);
+      }
+    } else if (role === "teacher") {
+      // Teacher trying to access student dashboard or admin portal
+      if (pathname.startsWith("/dashboard") || pathname.startsWith("/admin")) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/teacher/dashboard";
+        return NextResponse.redirect(url);
+      }
+    } else if (role === "parent") {
+      // Parent trying to access student dashboard, teacher or admin portal
+      if (pathname.startsWith("/dashboard") || pathname.startsWith("/teacher") || pathname.startsWith("/admin")) {
+        const url = request.nextUrl.clone();
+        url.pathname = "/parent/dashboard";
+        return NextResponse.redirect(url);
+      }
     }
   }
 
@@ -83,6 +88,7 @@ export async function middleware(request: NextRequest) {
 
 function getRoleHomePath(role: string): string {
   switch (role) {
+    case "admin": return "/admin/dashboard";
     case "teacher": return "/teacher/dashboard";
     case "parent": return "/parent/dashboard";
     default: return "/dashboard";

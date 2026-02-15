@@ -13,7 +13,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Lightbulb, LogOut, User } from "lucide-react";
 
-type Role = "student" | "teacher" | "parent";
+type Role = "student" | "teacher" | "parent" | "admin";
 
 interface NavLink {
   href: string;
@@ -29,18 +29,25 @@ const NAV_LINKS: Record<Role, NavLink[]> = {
   parent: [
     { href: "/parent/dashboard", label: "首页" },
   ],
+  admin: [
+    { href: "/admin/dashboard", label: "概览" },
+    { href: "/admin/users", label: "用户管理" },
+    { href: "/admin/projects", label: "项目管理" },
+  ],
 };
 
 const HOME_PATHS: Record<Role, string> = {
   student: "/dashboard",
   teacher: "/teacher/dashboard",
   parent: "/parent/dashboard",
+  admin: "/admin/dashboard",
 };
 
 const ROLE_LABELS: Record<Role, string> = {
   student: "学生",
   teacher: "教师",
   parent: "家长",
+  admin: "管理员",
 };
 
 interface NavbarProps {
