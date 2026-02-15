@@ -12,6 +12,13 @@ export function getAIClient(): OpenAI {
   return client;
 }
 
+/**
+ * Strip <think>...</think> blocks from MiniMax-M2.5 reasoning output.
+ */
+function stripThinkTags(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/g, "").trimStart();
+}
+
 export interface ChatRequest {
   systemPrompt: string;
   messages: { role: "user" | "assistant"; content: string }[];
@@ -38,7 +45,7 @@ export async function chat({
     ],
   });
 
-  return response.choices[0]?.message?.content || "";
+  return stripThinkTags(response.choices[0]?.message?.content || "");
 }
 
 export async function* chatStream({
@@ -61,10 +68,54 @@ export async function* chatStream({
     ],
   });
 
+  // Track whether we are inside a <think> block
+  let insideThink = false;
+  let buffer = "";
+
   for await (const chunk of stream) {
     const delta = chunk.choices[0]?.delta?.content;
-    if (delta) {
-      yield delta;
+    if (!delta) continue;
+
+    buffer += delta;
+
+    // Process buffer to strip <think>...</think> blocks
+    while (buffer.length > 0) {
+      if (insideThink) {
+        const closeIdx = buffer.indexOf("</think>");
+        if (closeIdx !== -1) {
+          // Skip everything up to and including </think>
+          buffer = buffer.slice(closeIdx + 8);
+          insideThink = false;
+        } else {
+          // Still inside think block, consume entire buffer
+          buffer = "";
+          break;
+        }
+      } else {
+        const openIdx = buffer.indexOf("<think>");
+        if (openIdx !== -1) {
+          // Yield text before <think>
+          const before = buffer.slice(0, openIdx);
+          if (before) yield before;
+          buffer = buffer.slice(openIdx + 7);
+          insideThink = true;
+        } else {
+          // No <think> tag found — but buffer might contain a partial "<think"
+          // Hold back up to 6 chars (length of "<think" minus 1) to detect partial tags
+          const holdBack = 6;
+          if (buffer.length > holdBack) {
+            const safe = buffer.slice(0, buffer.length - holdBack);
+            buffer = buffer.slice(buffer.length - holdBack);
+            if (safe) yield safe;
+          }
+          break;
+        }
+      }
     }
+  }
+
+  // Flush remaining buffer
+  if (!insideThink && buffer) {
+    yield buffer;
   }
 }
