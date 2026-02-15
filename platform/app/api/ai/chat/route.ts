@@ -144,13 +144,16 @@ export async function POST(request: NextRequest) {
             );
           }
 
-          // Save assistant reply to database
+          // Save assistant reply to database (strip any residual think tags)
+          const cleanReply = fullReply
+            .replace(/<think>[\s\S]*?<\/think>/g, "")
+            .trim();
           await supabase.from("conversations").insert({
             project_id: projectId,
             step_number: stepNumber,
             node_id: nodeId,
             role: "assistant",
-            content: fullReply,
+            content: cleanReply,
           });
 
           controller.enqueue(
