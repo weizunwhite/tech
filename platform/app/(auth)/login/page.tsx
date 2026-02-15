@@ -14,7 +14,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Lightbulb } from "lucide-react";
+import { Lightbulb, GraduationCap, Users, BookOpen, Shield } from "lucide-react";
+
+const TEST_LOGINS = [
+  { email: "student@test.com", role: "student", label: "学生", icon: GraduationCap },
+  { email: "teacher@test.com", role: "teacher", label: "教师", icon: BookOpen },
+  { email: "parent@test.com", role: "parent", label: "家长", icon: Users },
+  { email: "admin@test.com", role: "admin", label: "管理员", icon: Shield },
+];
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,39 +29,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [adminSetupMsg, setAdminSetupMsg] = useState("");
-
-  async function handleAdminTestLogin() {
-    setError("");
-    setAdminSetupMsg("正在初始化管理员账号...");
-    // 先调用 setup 接口确保管理员账号存在
-    try {
-      await fetch("/api/admin/setup", { method: "POST" });
-    } catch {
-      // 忽略，可能已存在
-    }
-    // 自动填入并登录
-    setEmail("admin@admin.com");
-    setPassword("admin123");
-    setAdminSetupMsg("");
-    setLoading(true);
-
-    const supabase = createClient();
-    const { data, error: loginError } = await supabase.auth.signInWithPassword({
-      email: "admin@admin.com",
-      password: "admin123",
-    });
-
-    if (loginError) {
-      setError("管理员登录失败: " + loginError.message);
-      setLoading(false);
-      return;
-    }
-
-    const role = data.user?.user_metadata?.role || "student";
-    router.push(getRoleHomePath(role));
-    router.refresh();
-  }
+  const [setupStatus, setSetupStatus] = useState("");
 
   function getRoleHomePath(role: string): string {
     switch (role) {
@@ -86,6 +61,48 @@ export default function LoginPage() {
 
     const role = data.user?.user_metadata?.role || "student";
     router.push(getRoleHomePath(role));
+    router.refresh();
+  }
+
+  async function handleTestLogin(testEmail: string, role: string) {
+    setError("");
+    setSetupStatus("正在初始化测试账号...");
+    setLoading(true);
+
+    // 先确保测试账号存在
+    try {
+      const res = await fetch("/api/admin/setup", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "初始化失败");
+        setLoading(false);
+        setSetupStatus("");
+        return;
+      }
+    } catch {
+      setError("网络错误，请重试");
+      setLoading(false);
+      setSetupStatus("");
+      return;
+    }
+
+    setSetupStatus("正在登录...");
+
+    const supabase = createClient();
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({
+      email: testEmail,
+      password: "test123",
+    });
+
+    if (loginError) {
+      setError("登录失败: " + loginError.message);
+      setLoading(false);
+      setSetupStatus("");
+      return;
+    }
+
+    const userRole = data.user?.user_metadata?.role || role;
+    router.push(getRoleHomePath(userRole));
     router.refresh();
   }
 
@@ -132,20 +149,30 @@ export default function LoginPage() {
               {loading ? "登录中..." : "登录"}
             </Button>
           </form>
-          <div className="mt-4 pt-4 border-t border-dashed">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full text-sm"
-              onClick={handleAdminTestLogin}
-              disabled={loading}
-            >
-              {adminSetupMsg || "🔑 管理员测试登录"}
-            </Button>
-            <p className="mt-1 text-center text-[11px] text-muted-foreground">
-              admin@admin.com / admin123
+
+          {/* 测试快捷登录 */}
+          <div className="mt-5 pt-4 border-t border-dashed">
+            <p className="text-xs text-muted-foreground text-center mb-3">
+              {setupStatus || "快捷测试登录（密码统一 test123）"}
             </p>
+            <div className="grid grid-cols-4 gap-2">
+              {TEST_LOGINS.map(({ email: testEmail, role, label, icon: Icon }) => (
+                <Button
+                  key={role}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="flex flex-col items-center gap-1 h-auto py-2 text-xs"
+                  onClick={() => handleTestLogin(testEmail, role)}
+                  disabled={loading}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </Button>
+              ))}
+            </div>
           </div>
+
           <p className="mt-4 text-center text-sm text-muted-foreground">
             还没有账号？{" "}
             <Link href="/register" className="text-primary hover:underline">
