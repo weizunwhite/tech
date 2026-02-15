@@ -29,11 +29,11 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const pathname = request.nextUrl.pathname;
+
   // Protected routes: redirect to login if not authenticated
-  const protectedPaths = ["/dashboard", "/project"];
-  const isProtected = protectedPaths.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
-  );
+  const protectedPaths = ["/dashboard", "/project", "/teacher", "/parent"];
+  const isProtected = protectedPaths.some((path) => pathname.startsWith(path));
 
   if (isProtected && !user) {
     const url = request.nextUrl.clone();
@@ -41,19 +41,52 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Redirect authenticated users away from auth pages
+  // Redirect authenticated users away from auth pages with role-based routing
   const authPaths = ["/login", "/register"];
-  const isAuthPage = authPaths.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
-  );
+  const isAuthPage = authPaths.some((path) => pathname.startsWith(path));
 
   if (isAuthPage && user) {
+    const role = user.user_metadata?.role || "student";
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = getRoleHomePath(role);
     return NextResponse.redirect(url);
   }
 
+  // Role-based access control: prevent accessing wrong portal
+  if (user && isProtected) {
+    const role = user.user_metadata?.role || "student";
+
+    // Student trying to access teacher/parent portal
+    if (role === "student" && (pathname.startsWith("/teacher") || pathname.startsWith("/parent/dashboard"))) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
+
+    // Teacher trying to access student dashboard
+    if (role === "teacher" && pathname.startsWith("/dashboard")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/teacher/dashboard";
+      return NextResponse.redirect(url);
+    }
+
+    // Parent trying to access student dashboard or teacher portal
+    if (role === "parent" && (pathname.startsWith("/dashboard") || pathname.startsWith("/teacher"))) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/parent/dashboard";
+      return NextResponse.redirect(url);
+    }
+  }
+
   return supabaseResponse;
+}
+
+function getRoleHomePath(role: string): string {
+  switch (role) {
+    case "teacher": return "/teacher/dashboard";
+    case "parent": return "/parent/dashboard";
+    default: return "/dashboard";
+  }
 }
 
 export const config = {

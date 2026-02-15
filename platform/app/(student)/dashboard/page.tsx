@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Rocket, ArrowRight, FileText } from "lucide-react";
+import { Plus, Rocket, ArrowRight, FileText, MessageSquare } from "lucide-react";
 import { STEP_TITLES } from "@/types/project";
 
 export default async function DashboardPage() {
@@ -56,6 +56,18 @@ export default async function DashboardPage() {
         .limit(3)
     : { data: [] };
 
+  // Check for teacher feedback
+  const { data: teacherFeedback } = projectIds.length
+    ? await supabase
+        .from("conversations")
+        .select("content, created_at, project_id")
+        .in("project_id", projectIds)
+        .eq("role", "system")
+        .like("content", "%[教师反馈]%")
+        .order("created_at", { ascending: false })
+        .limit(3)
+    : { data: [] };
+
   const userName = userProfile?.name || user?.user_metadata?.name || "同学";
 
   return (
@@ -75,6 +87,27 @@ export default async function DashboardPage() {
           </Button>
         </Link>
       </div>
+
+      {/* Teacher feedback */}
+      {teacherFeedback && teacherFeedback.length > 0 && (
+        <Card className="mb-4 border-blue-500/20 bg-blue-500/5">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center shrink-0">
+                <MessageSquare className="w-4 h-4 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium mb-1">老师的反馈</p>
+                {teacherFeedback.slice(0, 2).map((fb, i) => (
+                  <p key={i} className="text-sm text-muted-foreground">
+                    {(fb.content as string).replace("[教师反馈] ", "")}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Parent encouragements */}
       {comments && comments.length > 0 && (
