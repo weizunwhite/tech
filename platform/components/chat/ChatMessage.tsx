@@ -1,6 +1,7 @@
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Bot, User } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 
 export interface Message {
   id: string;
@@ -13,8 +14,14 @@ interface ChatMessageProps {
   message: Message;
 }
 
+/** Strip <think>...</think> blocks (multiline) from AI responses */
+function stripThinkTags(text: string): string {
+  return text.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
+}
+
 export function ChatMessage({ message }: ChatMessageProps) {
   const isUser = message.role === "user";
+  const displayContent = isUser ? message.content : stripThinkTags(message.content);
 
   return (
     <div className={cn("flex gap-3", isUser && "flex-row-reverse")}>
@@ -37,7 +44,13 @@ export function ChatMessage({ message }: ChatMessageProps) {
             : "bg-muted rounded-bl-md"
         )}
       >
-        <p className="whitespace-pre-wrap">{message.content}</p>
+        {isUser ? (
+          <p className="whitespace-pre-wrap">{displayContent}</p>
+        ) : (
+          <div className="prose prose-sm prose-neutral dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+            <ReactMarkdown>{displayContent}</ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -30,6 +30,13 @@ export function buildContext(params: {
 
   let systemPrompt = nodeConfig.aiConfig.systemPrompt;
 
+  // Global conversation style constraints
+  systemPrompt += `\n\n【对话风格要求】
+- 每次回复最多只提出1-2个问题，等学生回答后再追问下一个，不要一次性抛出多个问题
+- 语言要口语化、简短，像朋友聊天一样，不要像老师在布置作业
+- 减少emoji使用，最多用1个
+- 不要使用markdown列表格式（不要用 - 或 1. 2. 3. 这样的格式），用自然的对话语言表达`;
+
   // Inject student grade for language adaptation
   if (params.studentGrade) {
     systemPrompt += `\n\n学生信息：${params.studentGrade}年级学生。请根据该年龄段调整你的语言复杂度。`;
