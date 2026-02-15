@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { FileText, FileCheck, FileClock, FileWarning } from "lucide-react";
@@ -5,6 +6,7 @@ import type { Deliverable } from "@/types/database";
 
 interface DeliverableCardProps {
   deliverable: Deliverable;
+  projectId?: string;
 }
 
 const statusConfig = {
@@ -18,12 +20,12 @@ const statusConfig = {
   },
 };
 
-export function DeliverableCard({ deliverable }: DeliverableCardProps) {
+export function DeliverableCard({ deliverable, projectId }: DeliverableCardProps) {
   const config = statusConfig[deliverable.status];
   const Icon = config.Icon;
 
-  return (
-    <Card className="hover:shadow-sm transition-shadow">
+  const cardContent = (
+    <Card className="hover:shadow-sm transition-shadow cursor-pointer">
       <CardContent className="flex items-center gap-4 py-4">
         <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
           <Icon className="w-5 h-5 text-primary" />
@@ -38,4 +40,15 @@ export function DeliverableCard({ deliverable }: DeliverableCardProps) {
       </CardContent>
     </Card>
   );
+
+  const pid = projectId || deliverable.project_id;
+  if (pid) {
+    return (
+      <Link href={`/project/${pid}/deliverables/${deliverable.id}`}>
+        {cardContent}
+      </Link>
+    );
+  }
+
+  return cardContent;
 }
