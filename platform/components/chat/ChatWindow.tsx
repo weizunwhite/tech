@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { ChatMessage, type Message } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 
@@ -20,14 +20,19 @@ export function ChatWindow({
   disabled = false,
 }: ChatWindowProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [streamingContent, setStreamingContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const scrollToBottom = useCallback(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, streamingContent, scrollToBottom]);
 
   const displayMessages =
     messages.length > 0
@@ -54,6 +59,7 @@ export function ChatWindow({
 
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
+    setStreamingContent("");
 
     try {
       const response = await fetch("/api/ai/chat", {
@@ -67,23 +73,74 @@ export function ChatWindow({
         }),
       });
 
-      const data = await response.json();
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "请求失败");
+      }
 
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: "assistant",
-        content: data.reply || "抱歉，我暂时无法回复。请稍后再试。",
-        createdAt: new Date().toISOString(),
-      };
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
+      let fullContent = "";
 
-      setMessages((prev) => [...prev, assistantMessage]);
-    } catch {
+      if (reader) {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const text = decoder.decode(value, { stream: true });
+          const lines = text.split("\n");
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const jsonStr = line.slice(6);
+            if (!jsonStr) continue;
+
+            try {
+              const data = JSON.parse(jsonStr);
+
+              if (data.error) {
+                throw new Error(data.error);
+              }
+
+              if (data.done) {
+                // Stream complete — add final message
+                setMessages((prev) => [
+                  ...prev,
+                  {
+                    id: (Date.now() + 1).toString(),
+                    role: "assistant",
+                    content: fullContent,
+                    createdAt: new Date().toISOString(),
+                  },
+                ]);
+                setStreamingContent("");
+                break;
+              }
+
+              if (data.content) {
+                fullContent += data.content;
+                setStreamingContent(fullContent);
+              }
+            } catch (parseErr) {
+              if (parseErr instanceof Error && parseErr.message !== "请求失败") {
+                // Skip JSON parse errors from incomplete chunks
+                continue;
+              }
+              throw parseErr;
+            }
+          }
+        }
+      }
+    } catch (err) {
+      const errorMsg =
+        err instanceof Error ? err.message : "网络连接出现问题";
+      setStreamingContent("");
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: "网络连接出现问题，请检查网络后重试。",
+          content: `抱歉，${errorMsg}。请稍后再试。`,
           createdAt: new Date().toISOString(),
         },
       ]);
@@ -94,11 +151,26 @@ export function ChatWindow({
 
   return (
     <div className="flex flex-col h-full">
+      {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
         {displayMessages.map((msg) => (
           <ChatMessage key={msg.id} message={msg} />
         ))}
-        {isLoading && (
+
+        {/* Streaming message (typing effect) */}
+        {streamingContent && (
+          <ChatMessage
+            message={{
+              id: "streaming",
+              role: "assistant",
+              content: streamingContent,
+              createdAt: new Date().toISOString(),
+            }}
+          />
+        )}
+
+        {/* Loading indicator (before stream starts) */}
+        {isLoading && !streamingContent && (
           <div className="flex items-center gap-2 text-muted-foreground text-sm pl-12">
             <div className="flex gap-1">
               <span className="w-2 h-2 bg-primary/40 rounded-full animate-bounce" />
@@ -110,6 +182,7 @@ export function ChatWindow({
         )}
       </div>
 
+      {/* Input */}
       <div className="border-t p-4 bg-card">
         <ChatInput onSend={handleSend} disabled={disabled || isLoading} />
       </div>

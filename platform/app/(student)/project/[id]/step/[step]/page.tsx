@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { STEP_TITLES } from "@/types/project";
-import { ChatWindow } from "@/components/chat/ChatWindow";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+import { StepContent } from "./StepContent";
 
 export default async function StepPage({
   params,
@@ -39,18 +39,28 @@ export default async function StepPage({
     .eq("step_number", stepNumber)
     .order("node_id");
 
-  // Fetch conversations for this step
+  // Fetch conversations for current node
+  const currentNode = project.current_node || `${stepNumber}.1`;
   const { data: conversations } = await supabase
     .from("conversations")
     .select("*")
     .eq("project_id", id)
     .eq("step_number", stepNumber)
+    .eq("node_id", currentNode)
     .order("created_at");
+
+  // Fetch existing form submissions for this step
+  const { data: formSubmissions } = await supabase
+    .from("form_submissions")
+    .select("*")
+    .eq("project_id", id)
+    .eq("step_number", stepNumber)
+    .order("created_at", { ascending: false })
+    .limit(1);
 
   const isCurrentStep = stepNumber === project.current_step;
   const isLocked = stepNumber > project.current_step;
 
-  // Node titles for step 1
   const nodeNames: Record<string, string> = {
     "1.1": "生活观察",
     "1.2": "问题筛选",
@@ -98,7 +108,7 @@ export default async function StepPage({
           </div>
         </div>
 
-        {/* Node tabs */}
+        {/* Node progress tabs */}
         {progress && progress.length > 0 && (
           <div className="flex gap-1">
             {progress.map((p) => (
@@ -119,26 +129,26 @@ export default async function StepPage({
         )}
       </div>
 
-      {/* Main Content: Chat + Side panel */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
-          <ChatWindow
-            projectId={id}
-            stepNumber={stepNumber}
-            nodeId={project.current_node || `${stepNumber}.1`}
-            initialMessages={
-              conversations?.map((c) => ({
-                id: c.id,
-                role: c.role as "user" | "assistant",
-                content: c.content,
-                createdAt: c.created_at,
-              })) || []
-            }
-            disabled={isLocked}
-          />
-        </div>
-      </div>
+      {/* Main Content */}
+      <StepContent
+        projectId={id}
+        stepNumber={stepNumber}
+        currentNode={currentNode}
+        isLocked={isLocked}
+        initialMessages={
+          conversations?.map((c) => ({
+            id: c.id,
+            role: c.role as "user" | "assistant",
+            content: c.content,
+            createdAt: c.created_at,
+          })) || []
+        }
+        existingFormData={
+          formSubmissions && formSubmissions.length > 0
+            ? formSubmissions[0].data
+            : null
+        }
+      />
     </div>
   );
 }
